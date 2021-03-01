@@ -127,6 +127,7 @@ int main() {
         IrcMessage msg;
         msg.hasError = 0;
 
+
         irc_parse_message(buffer, &msg);
         irc_print_message(&msg);
 
