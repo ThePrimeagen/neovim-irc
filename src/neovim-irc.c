@@ -11,7 +11,7 @@
 #include <irc.h>
 
 // This is the only port that works on every system guaranteed
-#define ECHO_PORT 42069
+#define ECHO_PORT 1337
 
 #define MAX_LINE 1000
 #define LISTENQ 1024
@@ -69,11 +69,11 @@ ssize_t writeline(int sockd, const void *vptr, size_t n) {
 */
 
 int main() {
-    int list_s;                
-    int conn_s;                
-    struct sockaddr_in servaddr;  
-    char buffer[MAX_LINE];      
-    char *endptr;                
+    int list_s;
+    int conn_s;
+    struct sockaddr_in servaddr;
+    char buffer[MAX_LINE];
+    char *endptr;
 
     short int port = (short int)ECHO_PORT;
 
@@ -94,8 +94,7 @@ int main() {
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port        = htons(port);
 
-
-    /*  Bind our socket addresss to the 
+    /*  Bind our socket addresss to the
         listening socket, and call listen()  */
 
     if ( bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0 ) {
@@ -119,6 +118,7 @@ int main() {
             exit(EXIT_FAILURE);
         }
 
+        printf("Awaiting message\n");
         int length = read_line(conn_s, buffer);
         if (length == -1) {
             exit(EXIT_FAILURE);
@@ -127,9 +127,9 @@ int main() {
         IrcMessage msg;
         msg.hasError = 0;
 
-
         irc_parse_message(buffer, &msg);
         irc_print_message(&msg);
+        irc_process_message(&msg);
 
         /*  Close the connected socket  */
 
