@@ -1,8 +1,136 @@
-#include <stdbool.h>
 #include <irc.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <ctype.h>
+#include <sys/time.h>
+ 
+// If I keep ruining everything, please just turn this into a dlinked list
+IrcUser* users[1337];
+int users_size = 0;
+
+long long current_timestamp() {
+    struct timeval te; 
+    gettimeofday(&te, NULL); // get current time
+    long long milliseconds = te.tv_sec*1000LL + te.tv_usec/1000; // calculate milliseconds
+    return milliseconds;
+}
+
+int irc_validate_string(char* str) {
+    int len = strlen(str);
+    int retVal = 1;
+    for (int i = 0; retVal && i < len; ++i) {
+        retVal = isalnum(str[i]) || ispunct(str[i]);
+    }
+    return retVal;
+}
+ 
+int insert_user(IrcUser* user) {
+    if (users_size == 1337) {
+        return 0;
+    }
+
+    int i = 0; 
+    int inserted = 0;
+
+    for (; inserted && i < users_size; ++i) {
+        if (users[i] == NULL) {
+            inserted = 1;
+            users[i] = user;
+        }
+    }
+
+    if (!inserted) {
+        inserted = 1;
+        users[users_size] = user;
+    }
+     
+    if (i + 1 >= users_size) {
+        users_size++;
+    }
+
+    return 1;
+}
+
+void remove_user(IrcUser* user) {
+    int removed = 0;
+    int i = 0;
+    for (; removed && i < users_size; ++i) {
+        if (users[i] != NULL && users[i]->from_fd == user->from_fd) {
+            removed = 1;
+            users[i] = NULL;
+        }
+    }
+     
+    if (i + 1 == users_size) {
+        users_size--;
+    }
+}
+
+IrcUser* create_user(int fd) {
+    IrcUser* user = (IrcUser*)malloc(sizeof(IrcUser));
+    user->from_fd = fd;
+    user->name = NULL;
+     
+    return user;
+}
+
+// that seems pretty safe
+void add_name(IrcUser* user, char* name) {
+    int len = strlen(name);
+    user->name = (char*)malloc(sizeof(char) * len);
+    memcpy(user->name, name, len);
+}
+ 
+IrcUser* find_user(int fd) {
+    IrcUser* user = NULL;
+
+    for (int i = 0; !user && i < users_size; ++i) {
+        IrcUser* u = users[i];
+        if (!u) {
+            continue;
+        }
+
+        if (u->from_fd == fd) {
+            user = u;
+        }
+    }
+
+    return user;
+}
+
+void delete_user(IrcUser* user) {
+    if (!user) {
+        return;
+    }
+
+    if (user->name) {
+        free(user->name);
+    }
+    free(user);
+}
+
+void delete_user_by_fd(int fd) {
+    delete_user(find_user(fd));
+}
+ 
+int irc_join(IrcMessage* msg) {
+    IrcUser* usr = find_user(msg->from_fd);
+    if (!usr) {
+        return 0;
+    }
+
+    if (usr->state != IrcStateWaitingToJoin) {
+        return 0;
+    }
+
+    if (!irc_validate_string(msg->from)) {
+        return 0;
+    }
+     
+    usr->state = IrcStateReady;
+    return 1;
+}
 
 char* parse_till_token(char* buffer, char* token) {
     char* next = strstr(buffer, token);
@@ -14,45 +142,44 @@ char* parse_till_token(char* buffer, char* token) {
     next[0] = 0;
     return ++next;
 }
-
-bool is_alpha_numeric_punc(const char* msg) {
-    bool alpha_num_chars = true;
-    int len = strlen(msg);
-    for (int i = 0; alpha_num_chars && i < len; ++i) {
-        alpha_num_chars = isalnum(msg[i]) || ispunct(msg[i]);
-    }
-
-    return alpha_num_chars;
+ 
+void irc_new_fd(int fd) {
+    IrcUser* user = create_user(fd);
+    user->state = IrcStateWaitingToJoin;
+    insert_user(user);
 }
 
-int validate(IrcMessage* msg) {
-    if (strlen(msg->from) > 15) {
-        return IrcNameTooLong;
+void irc_close_fd(int fd) {
+    IrcUser* user = find_user(fd);
+    if (!user) {
+        return;
     }
 
-    if (!is_alpha_numeric_punc(msg->from) || is_alpha_numeric_punc(msg->message) || 
-            is_alpha_numeric_punc(msg->to)) {
-
-        return IrcInvalidCharacters;
+    remove_user(user);
+    delete_user(user);
+}
+ 
+void irc_handle_pong(IrcMessage* msg) {
+    IrcUser* usr = find_user(msg->from_fd);
+    if (!usr) {
+        // TODO:A does this happen?  Lets not put logging and pretend it doesn.
+        return;
     }
-
-    if (strlen(msg->to) > 15) {
-        return IrcToNameTooLong;
-    }
-
-    return 1;
+    usr->last_pong_time = current_timestamp();
 }
 
-void irc_process_message(IrcMessage* msg) {
-    if (strcmp("PONG", msg->cmd) == 0) {
-        // Check to see if we sent a pong, if not, kick the connection
-    } else if (strcmp("PING", msg->cmd) == 0) {
-        // Boot the user
-    } else if (strcmp("JOIN", msg->cmd) == 0) {
-        // Basic requirements of having an alpha name.
-    } else if (strcmp("PRIVMSG", msg->cmd) == 0) {
-        irc_print_message(msg);
+void irc_print_usr(IrcUser* usr) {
+    printf("Usr(%d): %s\n", usr->from_fd, usr->name);
+    printf("Count: %d Rel: %llu \n", usr->relative_message_count, current_timestamp() - usr->last_pong_time);
+}
+
+void irc_print_usr_by_msg(IrcMessage* msg) {
+    IrcUser* usr = find_user(msg->from_fd);
+    if (!usr) {
+        printf("Usr(-1): Could not find User\n");
+        return;
     }
+    irc_print_usr(usr);
 }
 
 void irc_print_message(IrcMessage* out) {
@@ -110,3 +237,28 @@ void irc_parse_message(char* buffer, IrcMessage* out) {
     out->message = buffer + 1;
 }
 
+void irc_process_message(IrcMessage* msg) {
+    irc_print_usr_by_msg(msg);
+    if (strcmp("PONG", msg->cmd) == 0) {
+        irc_handle_pong(msg);
+    } else if (strcmp("PING", msg->cmd) == 0) {
+        irc_close_fd(msg->from_fd);
+    } else if (strcmp("JOIN", msg->cmd) == 0) {
+        irc_join(msg);
+    } else if (strcmp("PRIVMSG", msg->cmd) == 0) {
+        irc_print_message(msg);
+    }
+}
+
+const char* irc_state_to_string(IrcConnectionState state) { 
+    switch (state) {
+        case IrcStateDisconnected:
+            return "Disconnected";
+        case IrcStateReady:
+            return "Ready";
+        case IrcStateWaitingToJoin:
+        default:
+            return "WaitingToJoin";
+    }
+}
+ 

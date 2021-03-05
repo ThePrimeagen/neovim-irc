@@ -1,3 +1,8 @@
+#ifndef IRC_HEADER_H
+#define IRC_HEADER_H
+
+#include <stdint.h>
+
 typedef struct IrcMessage {
     char *ptr;
     int from_fd;
@@ -10,7 +15,7 @@ typedef struct IrcMessage {
 } IrcMessage;
 
 typedef enum IrcConnectionState {
-    IrcStateWaitingForJoin,
+    IrcStateWaitingToJoin,
     IrcStateReady,
     IrcStateDisconnected,
 } IrcConnectionState;
@@ -19,6 +24,7 @@ typedef struct IrcUser {
     int from_fd;
     char* name;
     int relative_message_count; 
+    unsigned long long int last_pong_time;
     IrcConnectionState state;
 } IrcUser;
 
@@ -29,9 +35,12 @@ typedef enum IrcError {
     IrcInvalidCharacters = -4,
 } IrcError;
 
+const char* irc_state_to_string(IrcConnectionState state);
+
 void irc_new_fd(int fd);
 void irc_close_fd(int fd);
 void irc_parse_message(char* buffer, IrcMessage* msg);
 void irc_print_message(IrcMessage* msg);
 void irc_process_message(IrcMessage* msg);
 
+#endif
