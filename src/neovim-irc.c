@@ -9,8 +9,10 @@
 #include <unistd.h>
 
 #include <irc.h>
+#include <mem-list.h>
 
 // This is the only port that works on every system guaranteed
+//
 #define ECHO_PORT 1337
 
 #define MAX_LINE 1000
@@ -18,7 +20,7 @@
 
 // Efficiency please?
 // This will clearly  break at MAX_LINE
-int read_line(int sock, char* buffer) {
+int read_line(int sock, MemoryNode* node) {
     size_t length = 0;
 
     while (1) {
@@ -44,7 +46,6 @@ int read_line(int sock, char* buffer) {
 }
 
 
-/*
 ssize_t writeline(int sockd, const void *vptr, size_t n) {
     size_t nleft;
     ssize_t nwritten;
@@ -53,12 +54,13 @@ ssize_t writeline(int sockd, const void *vptr, size_t n) {
     buffer = vptr;
     nleft  = n;
 
-    while ( nleft > 0 ) {
-        if ( (nwritten = write(sockd, buffer, nleft)) <= 0 ) {
-            if ( errno == EINTR )
+    while (nleft > 0) {
+        if ((nwritten = write(sockd, buffer, nleft)) <= 0) {
+            if (errno == EINTR) {
                 nwritten = 0;
-            else
+            } else {
                 return -1;
+            }
         }
         nleft  -= nwritten;
         buffer += nwritten;
@@ -66,7 +68,15 @@ ssize_t writeline(int sockd, const void *vptr, size_t n) {
 
     return n;
 }
-*/
+
+void for_each_user(IrcUser* usr, IrcMessage* msg) {
+    if (usr->from_fd == msg->from_fd) {
+        // DONT SEND IT AND RETURN
+        printf("We will normally return here. please prime remove me wwhen you are done.  for real.\n\n\n\n");
+    }
+
+    // writeline(usr->from_fd, msg->
+}
 
 int main() {
     int list_s;
@@ -80,7 +90,7 @@ int main() {
 
     /*  Create the listening socket  */
 
-    if ( (list_s = socket(AF_INET, SOCK_STREAM, 0)) < 0 ) {
+    if ((list_s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         fprintf(stderr, "ECHOSERV: Error creating listening socket.\n");
         exit(EXIT_FAILURE);
     }
@@ -111,13 +121,17 @@ int main() {
     /*  Enter an infinite loop to respond
         to client requests and echo input  */
 
+
+    printf("Hello waiting for connection\n");
+    if ((conn_s = accept(list_s, NULL, NULL)) < 0) {
+        fprintf(stderr, "ECHOSERV: Error calling accept()\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // THis is a good idea ;)
+    irc_new_fd(conn_s);
+
     while (1) {
-
-        if ((conn_s = accept(list_s, NULL, NULL)) < 0) {
-            fprintf(stderr, "ECHOSERV: Error calling accept()\n");
-            exit(EXIT_FAILURE);
-        }
-
         printf("Awaiting message\n");
         int length = read_line(conn_s, buffer);
         if (length == -1) {
@@ -125,17 +139,18 @@ int main() {
         }
 
         IrcMessage msg;
+        msg.from_fd = conn_s;
         msg.hasError = 0;
 
         irc_parse_message(buffer, &msg);
         irc_print_message(&msg);
-        irc_process_message(&msg);
 
-        /*  Close the connected socket  */
-
-        if ( close(conn_s) < 0 ) {
-            fprintf(stderr, "ECHOSERV: Error calling close()\n");
-            exit(EXIT_FAILURE);
+        if (irc_process_message(&msg)) {
+            irc_for_each_user(&for_each_user, &msg);
+        } else {
+            printf("Closing down the connection %d\n", msg.from_fd);
+            // detele the users?
+            close(conn_s);
         }
     }
 }
