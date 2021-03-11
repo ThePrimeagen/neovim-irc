@@ -7,9 +7,10 @@ typedef struct MemoryNode {
     struct MemoryNode* prev;
     struct MemoryNode* next;
     char* data;
+    int length;
 } MemoryNode;
 
-void get_memory(MemoryNode* mem);
+MemoryNode* get_memory();
 void release_memory(MemoryNode* mem);
 int get_max_size();
 

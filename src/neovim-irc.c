@@ -22,8 +22,11 @@
 // This will clearly  break at MAX_LINE
 int read_line(int sock, MemoryNode* node) {
     size_t length = 0;
+    char* buffer = node->data;
+    int max_size = get_max_size();
+    int found = 0;
 
-    while (1) {
+    do {
         char data;
         int result = recv(sock, &data, 1, 0);
 
@@ -37,19 +40,22 @@ int read_line(int sock, MemoryNode* node) {
 
         printf("res: %.*s\n", (int)length, buffer);
 
-        if (length >= 2 && buffer[length - 2] == '\r' && buffer[length - 1] == '\n') {
-            break;
-        }
+        found = length >= 2 && buffer[length - 2] == '\r' && buffer[length - 1] == '\n';
+    } while (!found && length < max_size);
+
+    if (found) {
+        node->length = length;
+        return 1;
     }
 
-    return length;
+    return 0;
 }
 
 
-ssize_t writeline(int sockd, const void *vptr, size_t n) {
+ssize_t writeline(int sockd, const void* vptr, size_t n) {
     size_t nleft;
     ssize_t nwritten;
-    const char *buffer;
+    const char* buffer;
 
     buffer = vptr;
     nleft  = n;
@@ -75,18 +81,16 @@ void for_each_user(IrcUser* usr, IrcMessage* msg) {
         printf("We will normally return here. please prime remove me wwhen you are done.  for real.\n\n\n\n");
     }
 
-    // writeline(usr->from_fd, msg->
+    writeline(usr->from_fd, msg->original->data, msg->original->length);
 }
 
 int main() {
     int list_s;
     int conn_s;
     struct sockaddr_in servaddr;
-    char buffer[MAX_LINE];
     char *endptr;
 
     short int port = (short int)ECHO_PORT;
-
 
     /*  Create the listening socket  */
 
@@ -94,7 +98,6 @@ int main() {
         fprintf(stderr, "ECHOSERV: Error creating listening socket.\n");
         exit(EXIT_FAILURE);
     }
-
 
     /*  Set all bytes in socket address structure to
         zero, and fill in the relevant data members   */
@@ -107,20 +110,18 @@ int main() {
     /*  Bind our socket addresss to the
         listening socket, and call listen()  */
 
-    if ( bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0 ) {
+    if (bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
         fprintf(stderr, "ECHOSERV: Error calling bind()\n");
         exit(EXIT_FAILURE);
     }
 
-    if ( listen(list_s, LISTENQ) < 0 ) {
+    if (listen(list_s, LISTENQ) < 0) {
         fprintf(stderr, "ECHOSERV: Error calling listen()\n");
         exit(EXIT_FAILURE);
     }
 
-
     /*  Enter an infinite loop to respond
         to client requests and echo input  */
-
 
     printf("Hello waiting for connection\n");
     if ((conn_s = accept(list_s, NULL, NULL)) < 0) {
@@ -133,16 +134,26 @@ int main() {
 
     while (1) {
         printf("Awaiting message\n");
-        int length = read_line(conn_s, buffer);
+        MemoryNode* node = get_memory();
+        int length = read_line(conn_s, node);
+
         if (length == -1) {
             exit(EXIT_FAILURE);
         }
 
         IrcMessage msg;
+        MemoryNode* copied = get_memory();
+        // TODO: Refactor me, but future you.  So not right now while you read
+        // this. Or !so @polarmutex 
+        //
+        // ^-- tj paid actually money in subs for me to write this.
+        memcpy(copied->data, node->data, node->length);
+        msg.original = node;
+        msg.copied = copied;
         msg.from_fd = conn_s;
         msg.hasError = 0;
 
-        irc_parse_message(buffer, &msg);
+        irc_parse_message(&msg);
         irc_print_message(&msg);
 
         if (irc_process_message(&msg)) {

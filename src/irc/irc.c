@@ -222,9 +222,9 @@ void irc_parse_join(char* buffer, IrcMessage* out) {
     add_name(user, out->from);
 }
 
-void irc_parse_message(char* buffer, IrcMessage* out) {
+void irc_parse_message(IrcMessage* out) {
     // <:from> <cmd> <to> <:message>
-
+    char* buffer = out->copied->data;
     char* next;
 
     if (buffer[0] == ':') {
@@ -273,6 +273,19 @@ void irc_parse_message(char* buffer, IrcMessage* out) {
     }
 
     out->message = buffer + 1;
+}
+
+void irc_for_each_user(void(*fn)(IrcUser* usr, IrcMessage* msg), IrcMessage* msg) {
+    // TODO: Future me that needs threads.
+    //
+    // This is where you have to ask yourself, what's that semaphore?
+    //                                                                - past me
+    //
+    for (int i = 0; i < users_size; ++i) {
+        if (users[i] != NULL) {
+            fn(users[i], msg);
+        }
+    }
 }
 
 // this is terrible code

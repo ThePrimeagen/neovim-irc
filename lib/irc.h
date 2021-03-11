@@ -3,7 +3,11 @@
 
 #include <stdint.h>
 
+#include "mem-list.h"
+
 typedef struct IrcMessage {
+    MemoryNode* original;
+    MemoryNode* copied;
     char *ptr;
     int from_fd;
     char* from;
@@ -35,25 +39,18 @@ typedef enum IrcError {
     IrcInvalidCharacters = -4,
 } IrcError;
 
-char* PRIVMSG = "PRIVMSG";
-char* JOIN = "JOIN";
-char* PING = "PING";
-char* PONG = "PONG";
+#define PRIVMSG "PRIVMSG"
+#define JOIN "JOIN"
+#define PING "PING"
+#define PONG "PONG"
 
 const char* irc_state_to_string(IrcConnectionState state);
 
 void irc_new_fd(int fd);
 void irc_close_fd(int fd);
-void irc_parse_message(char* buffer, IrcMessage* msg);
+void irc_parse_message(IrcMessage* msg);
 void irc_print_message(IrcMessage* msg);
 int irc_process_message(IrcMessage* msg);
 void irc_for_each_user(void(*ptr)(IrcUser* usr, IrcMessage* msg), IrcMessage* msg);
-
-
-
-
-
-
-
 
 #endif

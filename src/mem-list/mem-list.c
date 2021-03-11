@@ -4,20 +4,21 @@
 MemoryNode* memories;
 int max_size = 1000;
 
-void create_memory(MemoryNode* mem) {
-    mem = (MemoryNode*)malloc(sizeof(MemoryList));
+// this will cause 3 segfaults before the nights over
+MemoryNode* create_memory() {
+    MemoryNode* mem = (MemoryNode*)malloc(sizeof(MemoryNode));
     mem->next = NULL;
     mem->prev = NULL;
     mem->data = (char*)malloc(sizeof(char*) * max_size);
+    return mem;
 }
 
-void get_memory(MemoryNode* mem) {
+MemoryNode* get_memory() {
     if (!memories) {
-        create_memory(mem);
-        return;
+        return create_memory();
     }
 
-    mem = memories;
+    MemoryNode* mem = memories;
     if (memories->prev) {
         memories->prev->next = NULL;
         memories->prev = NULL;
@@ -26,6 +27,7 @@ void get_memory(MemoryNode* mem) {
     }
 
     memset(mem->data, 0, sizeof(char*) * max_size);
+    return mem;
 }
 
 void release_memory(MemoryNode* mem) {
