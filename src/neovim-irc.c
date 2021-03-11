@@ -7,9 +7,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/select.h>
 
-#include <irc.h>
-#include <mem-list.h>
+#include "irc.h"
+#include "user.h"
+#include "mem-list.h"
 
 // This is the only port that works on every system guaranteed
 //
@@ -75,18 +77,49 @@ ssize_t writeline(int sockd, const void* vptr, size_t n) {
     return n;
 }
 
-void for_each_user(IrcUser* usr, IrcMessage* msg) {
-    if (usr->from_fd == msg->from_fd) {
-        // DONT SEND IT AND RETURN
-        printf("We will normally return here. please prime remove me wwhen you are done.  for real.\n\n\n\n");
+void read_from_socket(int conn) {
+    printf("Awaiting message\n");
+    MemoryNode* node = get_memory();
+    int length = read_line(conn, node);
+
+    if (length == -1) {
+        exit(EXIT_FAILURE);
     }
 
-    writeline(usr->from_fd, msg->original->data, msg->original->length);
+    IrcMessage msg;
+    MemoryNode* copied = get_memory();
+    // TODO: Refactor me, but future you.  So not right now while you read
+    // this. Or !so @polarmutex 
+    //
+    // ^-- tj paid actually money in subs for me to write this.
+    memcpy(copied->data, node->data, node->length);
+    msg.original = node;
+    msg.copied = copied;
+    msg.from_fd = conn;
+    msg.hasError = 0;
+
+    irc_parse_message(&msg);
+    irc_print_message(&msg);
+
+    if (irc_process_message(&msg)) {
+        IrcUser** users = get_user_list();
+        for (int i = 0; i < get_users_size(); ++i) {
+            // TODO: This should definitely get semaphored out of its mind
+            if (users[i]->from_fd == conn) {
+                printf("Please remove me, but for testing purposes, this is nice, and continue here.\n");
+            }
+
+            writeline(users[i]->from_fd, msg.original->data, msg.original->length);
+        }
+    } else {
+        printf("Closing down the connection %d\n", msg.from_fd);
+        // detele the users?
+        close(conn);
+    }
 }
 
 int main() {
-    int list_s;
-    int conn_s;
+    int sock;
     struct sockaddr_in servaddr;
     char *endptr;
 
@@ -94,7 +127,7 @@ int main() {
 
     /*  Create the listening socket  */
 
-    if ((list_s = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         fprintf(stderr, "ECHOSERV: Error creating listening socket.\n");
         exit(EXIT_FAILURE);
     }
@@ -110,58 +143,53 @@ int main() {
     /*  Bind our socket addresss to the
         listening socket, and call listen()  */
 
-    if (bind(list_s, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0) {
+    if (bind(sock, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
         fprintf(stderr, "ECHOSERV: Error calling bind()\n");
         exit(EXIT_FAILURE);
     }
 
-    if (listen(list_s, LISTENQ) < 0) {
+    if (listen(sock, LISTENQ) < 0) {
         fprintf(stderr, "ECHOSERV: Error calling listen()\n");
         exit(EXIT_FAILURE);
     }
 
-    /*  Enter an infinite loop to respond
-        to client requests and echo input  */
-
-    printf("Hello waiting for connection\n");
-    if ((conn_s = accept(list_s, NULL, NULL)) < 0) {
-        fprintf(stderr, "ECHOSERV: Error calling accept()\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // THis is a good idea ;)
-    irc_new_fd(conn_s);
+    fd_set active_fd_set;
+    FD_ZERO(&active_fd_set);
+    struct sockaddr_in clientname;
 
     while (1) {
-        printf("Awaiting message\n");
-        MemoryNode* node = get_memory();
-        int length = read_line(conn_s, node);
+        FD_SET(sock, &active_fd_set);
 
-        if (length == -1) {
+        IrcUser** users = get_user_list();
+        for (int i = 0; i < get_users_size(); ++i) {
+            FD_SET(users[i]->from_fd, &active_fd_set);
+        }
+
+        if (select (FD_SETSIZE, &active_fd_set, NULL, NULL, NULL) < 0) {
+            printf("OHH MY GOODNSES %d\n", errno);
             exit(EXIT_FAILURE);
         }
 
-        IrcMessage msg;
-        MemoryNode* copied = get_memory();
-        // TODO: Refactor me, but future you.  So not right now while you read
-        // this. Or !so @polarmutex 
-        //
-        // ^-- tj paid actually money in subs for me to write this.
-        memcpy(copied->data, node->data, node->length);
-        msg.original = node;
-        msg.copied = copied;
-        msg.from_fd = conn_s;
-        msg.hasError = 0;
-
-        irc_parse_message(&msg);
-        irc_print_message(&msg);
-
-        if (irc_process_message(&msg)) {
-            irc_for_each_user(&for_each_user, &msg);
-        } else {
-            printf("Closing down the connection %d\n", msg.from_fd);
-            // detele the users?
-            close(conn_s);
+        printf("Data is available now.\n");
+        
+        for (int i = 0; i < FD_SETSIZE; ++i) {
+            if (FD_ISSET (i, &active_fd_set)) {
+                if (i == sock) {
+                    /* Connection request on original socket. */
+                    size_t size = sizeof (clientname);
+                    int conn = accept(sock, NULL, NULL);
+                    if (conn < 0) {
+                        fprintf(stderr, "ECHOSERV: Error calling accept()\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    
+                    // THis is a good idea ;) - Prime0
+                    // Is it though? - Prime1
+                    irc_new_fd(conn);
+                } else {
+                    read_from_socket(i);
+                }
+            }
         }
     }
 }

@@ -1,4 +1,3 @@
-
 add_library(irc irc.c)
 
 target_include_directories(irc INTERFACE
