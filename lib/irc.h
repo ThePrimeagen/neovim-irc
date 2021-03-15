@@ -32,7 +32,6 @@ typedef enum IrcError {
 #define PONG "PONG"
 
 void irc_new_fd(int fd);
-void irc_close_fd(int fd);
 void irc_parse_message(IrcMessage* msg);
 void irc_print_message(IrcMessage* msg);
 int irc_process_message(IrcMessage* msg);

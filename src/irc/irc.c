@@ -77,16 +77,6 @@ void irc_new_fd(int fd) {
     insert_user(user);
 }
 
-void irc_close_fd(int fd) {
-    User* user = find_user(fd);
-    if (!user) {
-        return;
-    }
-
-    remove_user(user);
-    delete_user(user);
-}
-
 void irc_handle_pong(IrcMessage* msg) {
     User* usr = find_user(msg->from_fd);
     if (!usr) {
@@ -188,19 +178,20 @@ void irc_parse_message(IrcMessage* out) {
 // this is terrible code
 int irc_process_message(IrcMessage* msg) {
     irc_print_usr_by_msg(msg);
+
     if (strcmp(PONG, msg->cmd) == 0) {
         irc_handle_pong(msg);
     } else if (strcmp(PING, msg->cmd) == 0) {
-        irc_close_fd(msg->from_fd);
+        return 0;
     } else if (strcmp(JOIN, msg->cmd) == 0) {
         printf("processing the join command\n");
         if (!irc_join(msg)) {
-            delete_user_by_fd(msg->from_fd);
             return 0;
         }
     } else if (strcmp(PRIVMSG, msg->cmd) == 0) {
         irc_print_message(msg);
     }
+
     return 1;
 }
 
