@@ -18,7 +18,7 @@ int irc_validate_string(char* str) {
 }
 
 // that seems pretty safe
-void add_name(IrcUser* user, char* name) {
+void add_name(User* user, char* name) {
     int len = strlen(name);
     user->name = (char*)malloc(sizeof(char) * len);
     if (!user->name) {
@@ -33,7 +33,8 @@ void delete_user_by_fd(int fd) {
 }
 
 int irc_join(IrcMessage* msg) {
-    IrcUser* usr = find_user(msg->from_fd);
+    User* usr = find_user(msg->from_fd);
+
     if (!usr) {
         printf("could not find the user...\n");
         return 0;
@@ -50,7 +51,7 @@ int irc_join(IrcMessage* msg) {
     }
 
     printf("great success, The user is now joinededec:w :w \n");
-    usr->state = IrcStateReady;
+    usr->irc_state = IrcStateReady;
     return 1;
 }
 
@@ -71,13 +72,13 @@ char* parse_till_token(char* buffer, char* token, int untilEnd) {
 }
 
 void irc_new_fd(int fd) {
-    IrcUser* user = create_user(fd);
-    user->state = IrcStateWaitingToJoin;
+    User* user = create_user(fd);
+    user->irc_state = IrcStateWaitingToJoin;
     insert_user(user);
 }
 
 void irc_close_fd(int fd) {
-    IrcUser* user = find_user(fd);
+    User* user = find_user(fd);
     if (!user) {
         return;
     }
@@ -87,7 +88,7 @@ void irc_close_fd(int fd) {
 }
 
 void irc_handle_pong(IrcMessage* msg) {
-    IrcUser* usr = find_user(msg->from_fd);
+    User* usr = find_user(msg->from_fd);
     if (!usr) {
         // TODO:A does this happen?  Lets not put logging and pretend it doesn.
         return;
@@ -95,13 +96,13 @@ void irc_handle_pong(IrcMessage* msg) {
     usr->last_pong_time = current_timestamp();
 }
 
-void irc_print_usr(IrcUser* usr) {
+void irc_print_usr(User* usr) {
     printf("Usr(%d): %s\n", usr->from_fd, usr->name);
     printf("Count: %d Rel: %llu \n", usr->relative_message_count, current_timestamp() - usr->last_pong_time);
 }
 
 void irc_print_usr_by_msg(IrcMessage* msg) {
-    IrcUser* usr = find_user(msg->from_fd);
+    User* usr = find_user(msg->from_fd);
     if (!usr) {
         printf("Usr(-1): Could not find User\n");
         return;
@@ -127,7 +128,7 @@ void irc_parse_join(char* buffer, IrcMessage* out) {
     // channels... think about it
     //
     // Currently, do nothing, just a join is sufficient....
-    IrcUser* user = find_user(out->from_fd);
+    User* user = find_user(out->from_fd);
     add_name(user, out->from);
 }
 

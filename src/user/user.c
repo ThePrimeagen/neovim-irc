@@ -7,10 +7,10 @@
 #define MAX_USERS 1337
 
 // If I keep ruining everything, please just turn this into a dlinked list
-IrcUser* users[MAX_USERS];
+User* users[MAX_USERS];
 int users_size = 0;
 
-IrcUser** get_user_list() {
+User** get_user_list() {
     return users;
 }
 
@@ -25,7 +25,7 @@ long long current_timestamp() {
     return milliseconds;
 }
 
-int insert_user(IrcUser* user) {
+int insert_user(User* user) {
     if (users_size == MAX_USERS) {
         return 0;
     }
@@ -52,7 +52,7 @@ int insert_user(IrcUser* user) {
     return 1;
 }
 
-void remove_user(IrcUser* user) {
+void remove_user(User* user) {
     int removed = 0;
     int i = 0;
     for (; removed && i < users_size; ++i) {
@@ -67,8 +67,8 @@ void remove_user(IrcUser* user) {
     }
 }
 
-IrcUser* create_user(int fd) {
-    IrcUser* user = (IrcUser*)malloc(sizeof(IrcUser));
+User* create_user(int fd) {
+    User* user = (User*)malloc(sizeof(User));
     if (!user) {
         printf("EVERYTHING IS BAD (create_user)\n");
         exit(69420);
@@ -76,15 +76,16 @@ IrcUser* create_user(int fd) {
 
     user->from_fd = fd;
     user->name = NULL;
+    user->scratch_data = get_memory();
 
     return user;
 }
 
-IrcUser* find_user(int fd) {
-    IrcUser* user = NULL;
+User* find_user(int fd) {
+    User* user = NULL;
 
     for (int i = 0; !user && i < users_size; ++i) {
-        IrcUser* u = users[i];
+        User* u = users[i];
         if (!u) {
             continue;
         }
@@ -97,13 +98,16 @@ IrcUser* find_user(int fd) {
     return user;
 }
 
-void delete_user(IrcUser* user) {
+void delete_user(User* user) {
     if (!user) {
         return;
     }
+    remove_user(user);
 
     if (user->name) {
         free(user->name);
     }
+
+    release_memory(user->scratch_data);
     free(user);
 }
