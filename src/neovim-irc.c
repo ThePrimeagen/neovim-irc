@@ -84,6 +84,7 @@ int main() {
                     int conn = accept(sock, NULL, NULL);
                     if (conn < 0) {
                         fprintf(stderr, "ECHOSERV: Error calling accept()\n");
+                        // todo fix me and piq is shouldn't of said that
                         exit(EXIT_FAILURE);
                     }
 

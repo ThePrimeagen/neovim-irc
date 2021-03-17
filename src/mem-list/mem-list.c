@@ -1,15 +1,16 @@
 #include "mem-list.h"
 #include "string.h"
 
-MemoryNode* memories;
+MemoryNode* memories = NULL;
 int max_size = 1000;
 
 // this will cause 3 segfaults before the nights over
 MemoryNode* create_memory() {
     MemoryNode* mem = (MemoryNode*)malloc(sizeof(MemoryNode));
+    mem->length = 0;
     mem->next = NULL;
     mem->prev = NULL;
-    mem->data = (char*)malloc(sizeof(char*) * max_size);
+    mem->data = (char*)malloc(sizeof(char) * max_size);
     return mem;
 }
 
@@ -20,8 +21,9 @@ MemoryNode* get_memory() {
 
     MemoryNode* mem = memories;
     if (memories->prev) {
-        memories->prev->next = NULL;
-        memories->prev = NULL;
+        memories = memories->prev;
+        memories->next->prev = NULL;
+        memories->next = NULL;
     } else {
         memories = NULL;
     }

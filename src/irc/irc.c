@@ -40,7 +40,7 @@ int irc_join(IrcMessage* msg) {
         return 0;
     }
 
-    if (usr->state != IrcStateWaitingToJoin) {
+    if (usr->irc_state != IrcStateWaitingToJoin) {
         printf("usr->state != IrcStateWaitingToJoin\n");
         return 0;
     }
@@ -52,6 +52,7 @@ int irc_join(IrcMessage* msg) {
 
     printf("great success, The user is now joinededec:w :w \n");
     usr->irc_state = IrcStateReady;
+
     return 1;
 }
 
@@ -101,6 +102,7 @@ void irc_print_usr_by_msg(IrcMessage* msg) {
 }
 
 void irc_print_message(IrcMessage* out) {
+    printf("DEBUG MESSAGE %p\n", out->cmd);
     printf("IRC Message %s\n", out->cmd);
     if (out->hasError) {
         printf("  Has Error: %s\n", out->error);

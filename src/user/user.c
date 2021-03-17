@@ -77,6 +77,12 @@ User* create_user(int fd) {
     user->from_fd = fd;
     user->name = NULL;
     user->scratch_data = get_memory();
+    user->last_pong_time = current_timestamp();
+    user->relative_message_count = 0;
+    user->irc_state = IrcStateWaitingToJoin;
+    user->state = UserStateWaitingForData;
+
+    printf("Created a new user, %d - %p\n", fd, user->scratch_data);
 
     return user;
 }

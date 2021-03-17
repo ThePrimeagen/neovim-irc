@@ -29,7 +29,7 @@ void read_line(int sock, User* user) {
 
     do {
         char data;
-        int result = recv(sock, &data, max_size, 0);
+        int result = recv(sock, &data, 1, 0);
 
         if (result == 0) {
             done = 1;
@@ -37,6 +37,7 @@ void read_line(int sock, User* user) {
             user->state = UserStateError;
             return;
         } else {
+            printf("buffer[%zu] = %c\n", length, data);
             buffer[length] = data;
             length++;
             done = length >= 2 && buffer[length - 2] == '\r' &&
