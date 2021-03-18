@@ -8,6 +8,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/select.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
 
 #include "socket.h"
 #include "irc.h"
@@ -35,6 +37,22 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    int on = 1;
+    int rc = setsockopt(sock, SOL_SOCKET,  SO_REUSEADDR,
+                   (char *)&on, sizeof(on));
+    if (rc < 0) {
+        perror("setsockopt() failed");
+        close(sock);
+        exit(-1);
+    }
+
+    rc = ioctl(sock, FIONBIO, (char *)&on);
+    if (rc < 0) {
+        perror("ioctl() failed");
+        close(sock);
+        exit(-1);
+    }
+
     /*  Set all bytes in socket address structure to
         zero, and fill in the relevant data members   */
 
@@ -56,50 +74,76 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    fd_set active_fd_set;
-    FD_ZERO(&active_fd_set);
+    fd_set active_set;
+    int max_sd = sock;
     struct sockaddr_in clientname;
 
-    while (1) {
-        FD_SET(sock, &active_fd_set);
+    do {
+
+        FD_SET(sock, &active_set);
 
         User** users = get_user_list();
         for (int i = 0; i < get_users_size(); ++i) {
-            FD_SET(users[i]->from_fd, &active_fd_set);
+            FD_SET(users[i]->from_fd, &active_set);
         }
 
-        printf("About to select\n");
-        if (select (FD_SETSIZE, &active_fd_set, NULL, NULL, NULL) < 0) {
-            printf("OHH MY GOODNSES %d\n", errno);
+        printf("About to select %d\n", max_sd);
+        int desc_count = select(max_sd + 1, &active_set, NULL, NULL, NULL);
+        printf("desc_count %d\n", desc_count);
+        if (desc_count < 0) {
+            perror("select() has failed");
             exit(EXIT_FAILURE);
+        } else if (desc_count == 0) {
+            // Is this case for timeouts?
         }
 
         printf("Data is available now.\n");
-
-        for (int i = 0; i < FD_SETSIZE; ++i) {
-            if (FD_ISSET (i, &active_fd_set)) {
+        for (int i = 0; i < max_sd; ++i) {
+            printf("FD_ISSET(%d)\n", i);
+            if (FD_ISSET(i, &active_set)) {
+                printf("YES IT IS(%d)\n", i);
                 if (i == sock) {
-                    /* Connection request on original socket. */
-                    size_t size = sizeof (clientname);
-                    int conn = accept(sock, NULL, NULL);
-                    if (conn < 0) {
-                        fprintf(stderr, "ECHOSERV: Error calling accept()\n");
-                        // todo fix me and piq is shouldn't of said that
-                        exit(EXIT_FAILURE);
-                    }
 
-                    // THis is a good idea ;) - Prime0
-                    // Is it though? - Prime1
-                    irc_new_fd(conn);
+                    int conn;
+                    do {
+                        size_t size = sizeof(clientname);
+                        conn = accept(sock, NULL, NULL);
+                        if (conn < 0) {
+                            if (errno != EWOULDBLOCK) {
+                                perror("error calling accept()");
+                                exit(EXIT_FAILURE);
+                            }
+                            continue;
+                        }
+
+                        rc = ioctl(conn, FIONBIO, (char *)&on);
+                        if (rc < 0) {
+                            perror("ioctl() failed INCOMING_CONNECTION.");
+                            close(conn);
+                            close(sock);
+                            exit(-1);
+                        }
+
+                        irc_new_fd(conn);
+                        printf("incoming connection %d\n", conn);
+                        FD_SET(conn, &active_set);
+                        if (conn > max_sd) {
+                            max_sd = conn;
+                        }
+                    } while (conn != -1);
+
                 } else {
-                    if (read_from_socket(i) == 0) {
-                        User* user = find_user(i);
+                    int res = read_from_socket(i);
+                    printf("res rform read_from_socket %d\n", res);
+                    if (res < 0 && errno != EWOULDBLOCK || res == 0) {
+                        User *user = find_user(i);
                         delete_user(user);
                         close(i);
+                        FD_CLR(i, &active_set);
                     }
                 }
             }
         }
-    }
+    } while (1);
 }
 

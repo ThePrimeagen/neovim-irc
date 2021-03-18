@@ -29,7 +29,9 @@ void read_line(int sock, User* user) {
 
     do {
         char data;
+        printf("About to read data\n");
         int result = recv(sock, &data, 1, 0);
+        printf("read data\n");
 
         if (result == 0) {
             done = 1;
@@ -87,6 +89,7 @@ int read_from_socket(int conn) {
     User* usr = find_user(conn);
     read_line(conn, usr);
 
+    printf("read_from_socket %d user state(%d)\n", conn, usr->state);
     if (usr->state == UserStateError) {
         return 0;
     } else if (usr->state == UserStatePartiallyRead) {

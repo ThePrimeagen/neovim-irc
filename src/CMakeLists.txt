@@ -5,6 +5,7 @@ add_subdirectory(socket)
 add_subdirectory(user)
 add_subdirectory(irc)
 add_subdirectory(mem-list)
+add_subdirectory(message-queue)
 # #add_subdirectory(comms)
 #
 # list(APPEND EXTRA_LIBS system-commands)
@@ -16,6 +17,7 @@ list(APPEND EXTRA_LIBS socket)
 list(APPEND EXTRA_LIBS user)
 list(APPEND EXTRA_LIBS irc)
 list(APPEND EXTRA_LIBS mem-list)
+list(APPEND EXTRA_LIBS message-queue)
 #
 # add the executable
 add_executable(neovim-irc neovim-irc.c)
