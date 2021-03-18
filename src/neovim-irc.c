@@ -74,18 +74,18 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
+    fd_set master_set;
     fd_set active_set;
+
+    FD_ZERO(&master_set);
+    FD_SET(sock, &master_set);
+
     int max_sd = sock;
     struct sockaddr_in clientname;
 
     do {
 
-        FD_SET(sock, &active_set);
-
-        User** users = get_user_list();
-        for (int i = 0; i < get_users_size(); ++i) {
-            FD_SET(users[i]->from_fd, &active_set);
-        }
+        memcpy(&active_set, &master_set, sizeof(master_set));
 
         printf("About to select %d\n", max_sd);
         int desc_count = select(max_sd + 1, &active_set, NULL, NULL, NULL);
@@ -98,7 +98,7 @@ int main() {
         }
 
         printf("Data is available now.\n");
-        for (int i = 0; i < max_sd; ++i) {
+        for (int i = 0; i <= max_sd; ++i) {
             printf("FD_ISSET(%d)\n", i);
             if (FD_ISSET(i, &active_set)) {
                 printf("YES IT IS(%d)\n", i);
@@ -126,7 +126,7 @@ int main() {
 
                         irc_new_fd(conn);
                         printf("incoming connection %d\n", conn);
-                        FD_SET(conn, &active_set);
+                        FD_SET(conn, &master_set);
                         if (conn > max_sd) {
                             max_sd = conn;
                         }
@@ -139,7 +139,12 @@ int main() {
                         User *user = find_user(i);
                         delete_user(user);
                         close(i);
-                        FD_CLR(i, &active_set);
+                        FD_CLR(i, &master_set);
+                        if (i == max_sd) {
+                            while (FD_ISSET(max_sd, &master_set) == 0) {
+                                max_sd -= 1;
+                            }
+                        }
                     }
                 }
             }
