@@ -3,16 +3,17 @@
 
 #include <stdlib.h>
 
+#define MEMORY_MAX_SIZE 1024
+
 typedef struct MemoryNode {
     struct MemoryNode* prev;
     struct MemoryNode* next;
-    char* data;
     int length;
+    char data[MEMORY_MAX_SIZE];
 } MemoryNode;
 
 MemoryNode* get_memory();
 void release_memory(MemoryNode* mem);
-int get_max_size();
 
 #endif
 

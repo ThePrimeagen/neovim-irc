@@ -19,7 +19,6 @@
 // This will clearly  break at MAX_LINE
 void read_line(int sock, User* user) {
     char* buffer = user->scratch_data->data;
-    int max_size = get_max_size();
     int done = 0;
 
     size_t length = 0;
@@ -29,31 +28,31 @@ void read_line(int sock, User* user) {
 
     do {
         char data;
-        printf("About to read data\n");
         int result = recv(sock, &data, 1, 0);
-        printf("read data\n");
 
         if (result == 0) {
-            done = 1;
-        } else if ((result <= 0) || (data == EOF)) {
-            user->state = UserStateError;
-            return;
+            user->state = UserStateClosed;
+            break;
+        } else if (result < 0) {
+            if (errno != EWOULDBLOCK) {
+                user->state = UserStateError;
+            }
+            break;
         } else {
-            printf("buffer[%zu] = %c\n", length, data);
             buffer[length] = data;
             length++;
             done = length >= 2 && buffer[length - 2] == '\r' &&
                    buffer[length - 1] == '\n';
         }
 
-    } while (!done && length < max_size);
+    } while (!done && length < MEMORY_MAX_SIZE);
 
     user->scratch_data->length = length;
     if (done) {
         user->state = UserStateHasData;
-    } else if (length == max_size) {
+    } else if (length == MEMORY_MAX_SIZE) {
         user->state = UserStateError;
-    } else {
+    } else if (user->state != UserStateClosed) {
         user->state = UserStatePartiallyRead;
     }
 }
@@ -90,7 +89,7 @@ int read_from_socket(int conn) {
     read_line(conn, usr);
 
     printf("read_from_socket %d user state(%d)\n", conn, usr->state);
-    if (usr->state == UserStateError) {
+    if (usr->state == UserStateError || usr->state == UserStateClosed) {
         return 0;
     } else if (usr->state == UserStatePartiallyRead) {
         return 1;
@@ -116,6 +115,8 @@ int read_from_socket(int conn) {
     irc_parse_message(&msg);
     irc_print_message(&msg);
 
+    // This needs to be done on a different thread
+    int returnValue = 0;
     if (irc_process_message(&msg)) {
         User** users = get_user_list();
         for (int i = 0; i < get_users_size(); ++i) {
@@ -124,10 +125,14 @@ int read_from_socket(int conn) {
                 printf("Please remove me, but for testing purposes, this is nice, and continue here.\n");
             }
 
-            // TODO: This doesn't always work... yikes
             writeline(users[i]->from_fd, msg.original->data, msg.original->length);
         }
-        return 1;
+        returnValue = 1;
     }
-    return 0;
+
+    // Free the memory
+    release_memory(msg.original);
+    release_memory(msg.copied);
+
+    return returnValue;
 }

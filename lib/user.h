@@ -13,6 +13,7 @@ typedef enum UserState {
     UserStateWaitingForData,
     UserStatePartiallyRead,
     UserStateHasData,
+    UserStateClosed,
     UserStateError,
 } UserState;
 

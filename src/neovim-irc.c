@@ -135,7 +135,7 @@ int main() {
                 } else {
                     int res = read_from_socket(i);
                     printf("res rform read_from_socket %d\n", res);
-                    if (res < 0 && errno != EWOULDBLOCK || res == 0) {
+                    if (!res) {
                         User *user = find_user(i);
                         delete_user(user);
                         close(i);
