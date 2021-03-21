@@ -59,25 +59,27 @@ void read_line(int sock, User* user) {
 
 // SOLVE ME LATER, groooooowwwlll
 // cc @polarmutex, solve all my problems.
-ssize_t writeline(int sockd, const void* vptr, size_t n) {
-    // WTF??
-    size_t nleft;
-    ssize_t nwritten;
-    const char* buffer;
+ssize_t write_line(int sockd, char* buffer, size_t n) {
+    size_t remaining = n;
 
-    buffer = vptr;
-    nleft  = n;
+    while (remaining > 0) {
+        size_t nwritten = send(sockd, buffer, remaining, 0);
 
-    while (nleft > 0) {
-        if ((nwritten = write(sockd, buffer, nleft)) <= 0) {
-            if (errno == EINTR) {
-                nwritten = 0;
+        // TODO: non blocking whattt?
+        // can nwritten = 0?
+        if (nwritten < 0) {
+            if (errno == EWOULDBLOCK) {
+                printf("Yayayaya EWOK problems!\n");
+                continue; // ? keep going?
             } else {
                 return -1;
             }
         }
-        nleft  -= nwritten;
+
         buffer += nwritten;
+        remaining -= nwritten;
+
+        printf("write_line: remaining: %zu\n", remaining);
     }
 
     return n;
@@ -125,7 +127,8 @@ int read_from_socket(int conn) {
                 printf("Please remove me, but for testing purposes, this is nice, and continue here.\n");
             }
 
-            writeline(users[i]->from_fd, msg.original->data, msg.original->length);
+            printf("About to send data back\n");
+            write_line(users[i]->from_fd, msg.original->data, msg.original->length);
         }
         returnValue = 1;
     }
