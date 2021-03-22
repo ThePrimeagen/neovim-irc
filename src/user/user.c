@@ -26,6 +26,7 @@ long long current_timestamp() {
 }
 
 int insert_user(User* user) {
+    printf("User#insert_user(%p): %d %d\n", user, user->from_fd, MAX_USERS);
     if (users_size == MAX_USERS) {
         return 0;
     }
@@ -35,18 +36,16 @@ int insert_user(User* user) {
 
     for (; inserted && i < users_size; ++i) {
         if (users[i] == NULL) {
+            printf("User#insert_user(%p)# Inserting In Middle: %d \n", user, i);
             inserted = 1;
             users[i] = user;
         }
     }
 
+    printf("User#insert_user(%p)# End Of Loop(%d) %d \n", user, inserted, i);
     if (!inserted) {
         inserted = 1;
-        users[users_size] = user;
-    }
-
-    if (i + 1 >= users_size) {
-        users_size++;
+        users[users_size++] = user;
     }
 
     return 1;
@@ -90,12 +89,15 @@ User* create_user(int fd) {
 User* find_user(int fd) {
     User* user = NULL;
 
+    printf("find_user#users_size: %d\n", users_size);
     for (int i = 0; !user && i < users_size; ++i) {
         User* u = users[i];
         if (!u) {
+            printf("Could not find user %d\n", i);
             continue;
         }
 
+        printf("find_user#for(%d): %p - %d\n", i, u, u->from_fd);
         if (u->from_fd == fd) {
             user = u;
         }

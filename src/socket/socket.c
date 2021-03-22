@@ -18,6 +18,7 @@
 // Efficiency please?
 // This will clearly  break at MAX_LINE
 void read_line(int sock, User* user) {
+    printf("int sock = %d User %p\n", sock, user);
     char* buffer = user->scratch_data->data;
     int done = 0;
 

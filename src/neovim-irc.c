@@ -87,9 +87,7 @@ int main() {
 
         memcpy(&active_set, &master_set, sizeof(master_set));
 
-        printf("About to select %d\n", max_sd);
         int desc_count = select(max_sd + 1, &active_set, NULL, NULL, NULL);
-        printf("desc_count %d\n", desc_count);
         if (desc_count < 0) {
             perror("select() has failed");
             exit(EXIT_FAILURE);
@@ -97,11 +95,8 @@ int main() {
             // Is this case for timeouts?
         }
 
-        printf("Data is available now.\n");
         for (int i = 0; i <= max_sd; ++i) {
-            printf("FD_ISSET(%d)\n", i);
             if (FD_ISSET(i, &active_set)) {
-                printf("YES IT IS(%d)\n", i);
                 if (i == sock) {
 
                     int conn;
