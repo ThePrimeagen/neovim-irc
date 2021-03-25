@@ -106,7 +106,6 @@ int main() {
                         if (conn < 0) {
                             if (errno != EWOULDBLOCK) {
                                 perror("error calling accept()");
-                                exit(EXIT_FAILURE);
                             }
                             continue;
                         }
@@ -116,7 +115,6 @@ int main() {
                             perror("ioctl() failed INCOMING_CONNECTION.");
                             close(conn);
                             close(sock);
-                            exit(-1);
                         }
 
                         irc_new_fd(conn);
