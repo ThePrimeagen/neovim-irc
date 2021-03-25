@@ -52,6 +52,12 @@ void read_line(int sock, User* user) {
     if (done) {
         user->state = UserStateHasData;
     } else if (length == MEMORY_MAX_SIZE) {
+        char* name = "UNKNOWN";
+        if (user->name) {
+            name = user->name;
+        }
+        printf("You just tried to give me to much memory, stop it %s \n", name);
+
         user->state = UserStateError;
     } else if (user->state != UserStateClosed) {
         user->state = UserStatePartiallyRead;

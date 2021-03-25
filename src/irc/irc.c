@@ -36,21 +36,20 @@ int irc_join(IrcMessage* msg) {
     User* usr = find_user(msg->from_fd);
 
     if (!usr) {
-        printf("could not find the user...\n");
+        printf("FAILED TO JOIN: could not find the user...\n");
         return 0;
     }
 
     if (usr->irc_state != IrcStateWaitingToJoin) {
-        printf("usr->state != IrcStateWaitingToJoin\n");
+        printf("FAILED TO JOIN: usr->state != IrcStateWaitingToJoin\n");
         return 0;
     }
 
     if (!irc_validate_string(msg->from)) {
-        printf("irc_valide_string = Name is invalid\n");
+        printf("FAILED TO JOIN: irc_valide_string = Name is invalid\n");
         return 0;
     }
 
-    printf("great success, The user is now joinededec:w :w \n");
     usr->irc_state = IrcStateReady;
 
     return 1;
@@ -129,17 +128,15 @@ void irc_parse_message(IrcMessage* out) {
     char* buffer = out->copied->data;
     char* next;
 
-    if (buffer[0] == ':') {
-        next = parse_till_token(buffer, " ", 0);
-        if (next == NULL) {
-            out->hasError = 1;
-            out->error = "Message started with ':' but hand no space delimiter";
-            return;
-        }
-
-        out->from = buffer;
-        buffer = next;
+    next = parse_till_token(buffer, " ", 0);
+    if (next == NULL) {
+        out->hasError = 1;
+        out->error = "Message started with ':' but hand no space delimiter";
+        return;
     }
+
+    out->from = buffer;
+    buffer = next;
 
     next = parse_till_token(buffer, " ", 1);
     if (next == NULL) {
@@ -177,10 +174,21 @@ void irc_parse_message(IrcMessage* out) {
     out->message = buffer + 1;
 }
 
+int irc_validate_message(IrcMessage* msg, User* user) {
+    if (strncmp(msg->from, user->name, strlen(user->name)) != 0) {
+        return 0;
+    }
+
+    return 1;
+}
+
 // this is terrible code
 int irc_process_message(IrcMessage* msg) {
     irc_print_usr_by_msg(msg);
+    User* usr = find_user(msg->from_fd);
 
+    // TODO: I hate this
+    // TODONE: I'll love it
     if (strcmp(PONG, msg->cmd) == 0) {
         irc_handle_pong(msg);
     } else if (strcmp(PING, msg->cmd) == 0) {
@@ -190,8 +198,10 @@ int irc_process_message(IrcMessage* msg) {
         if (!irc_join(msg)) {
             return 0;
         }
-    } else if (strcmp(PRIVMSG, msg->cmd) == 0) {
+    } else if (strcmp(PRIVMSG, msg->cmd) == 0 && irc_validate_message(msg, usr)) {
         irc_print_message(msg);
+    } else {
+        return 0;
     }
 
     return 1;
