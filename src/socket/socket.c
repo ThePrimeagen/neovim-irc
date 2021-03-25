@@ -70,7 +70,7 @@ ssize_t write_line(int sockd, char* buffer, size_t n) {
     size_t remaining = n;
 
     while (remaining > 0) {
-        size_t nwritten = send(sockd, buffer, remaining, 0);
+        ssize_t nwritten = send(sockd, buffer, remaining, 0);
 
         // TODO: non blocking whattt?
         // can nwritten = 0?
@@ -93,7 +93,6 @@ ssize_t write_line(int sockd, char* buffer, size_t n) {
 }
 
 int read_from_socket(int conn) {
-    printf("Awaiting message\n");
     User* usr = find_user(conn);
     read_line(conn, usr);
 
@@ -129,12 +128,6 @@ int read_from_socket(int conn) {
     if (irc_process_message(&msg)) {
         User** users = get_user_list();
         for (int i = 0; i < get_users_size(); ++i) {
-            // TODO: This should definitely get semaphored out of its mind
-            if (users[i]->from_fd == conn) {
-                printf("Please remove me, but for testing purposes, this is nice, and continue here.\n");
-            }
-
-            printf("About to send data back\n");
             write_line(users[i]->from_fd, msg.original->data, msg.original->length);
         }
         returnValue = 1;

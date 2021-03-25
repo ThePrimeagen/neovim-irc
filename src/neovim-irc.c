@@ -132,6 +132,7 @@ int main() {
                     printf("res rform read_from_socket %d\n", res);
                     if (!res) {
                         User *user = find_user(i);
+
                         delete_user(user);
                         close(i);
                         FD_CLR(i, &master_set);
