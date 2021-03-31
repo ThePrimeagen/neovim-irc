@@ -7,7 +7,6 @@
 
 typedef struct MemoryNode {
     struct MemoryNode* prev;
-    struct MemoryNode* next;
     int length;
     char data[MEMORY_MAX_SIZE];
 } MemoryNode;
